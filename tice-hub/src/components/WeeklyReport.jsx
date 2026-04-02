@@ -11,6 +11,74 @@ function formatPercent(value) {
   return `${value.toFixed(1)}%`
 }
 
+function hasThreeWeekGrowth(trend) {
+  if (!Array.isArray(trend) || trend.length < 4) return false
+
+  let consecutiveGrowth = 0
+  for (let i = 1; i < trend.length; i += 1) {
+    if (trend[i] > trend[i - 1]) {
+      consecutiveGrowth += 1
+      if (consecutiveGrowth >= 3) return true
+    } else {
+      consecutiveGrowth = 0
+    }
+  }
+
+  return false
+}
+
+function buildWinReason(store) {
+  if (store.salesVsTarget >= 105) {
+    return `beating target by ${(store.salesVsTarget - 100).toFixed(1)}% with weekly sales of ${currency.format(store.weeklySales)}.`
+  }
+
+  if (store.laborCostPercent < store.laborTarget && store.foodCostPercent < store.foodCostTarget) {
+    return `holding both costs below target (labor ${formatPercent(store.laborCostPercent)}, food ${formatPercent(store.foodCostPercent)}).`
+  }
+
+  if (store.customerSatisfaction >= 4.5) {
+    return `delivering excellent customer satisfaction at ${store.customerSatisfaction.toFixed(1)}.`
+  }
+
+  return `posting 3+ consecutive weeks of sales growth (${store.salesTrend.join(' → ')}).`
+}
+
+function buildProblemReason(store) {
+  const issues = []
+
+  if (store.salesVsTarget < 92) {
+    issues.push(`sales at ${formatPercent(store.salesVsTarget)} vs target`)
+  }
+  if (store.laborCostPercent > store.laborTarget + 3) {
+    issues.push(`labor at ${formatPercent(store.laborCostPercent)} (target ${formatPercent(store.laborTarget)})`)
+  }
+  if (store.foodCostPercent > store.foodCostTarget + 3) {
+    issues.push(`food cost at ${formatPercent(store.foodCostPercent)} (target ${formatPercent(store.foodCostTarget)})`)
+  }
+  if (store.customerSatisfaction < 3.5) {
+    issues.push(`satisfaction at ${store.customerSatisfaction.toFixed(1)}`)
+  }
+  if (store.employeeTurnover > 25) {
+    issues.push(`turnover at ${formatPercent(store.employeeTurnover)}`)
+  }
+  if (store.driveThruTime > 300) {
+    issues.push(`drive-thru at ${store.driveThruTime}s`)
+  }
+
+  return `${issues.slice(0, 2).join('; ')}.`
+}
+
+function getCriticalScore(store) {
+  let score = 0
+  if (store.salesVsTarget < 92) score += 3
+  if (store.laborCostPercent > store.laborTarget + 3) score += 3
+  if (store.foodCostPercent > store.foodCostTarget + 3) score += 3
+  if (store.customerSatisfaction < 3.5) score += 2
+  if (store.employeeTurnover > 25) score += 2
+  if (store.driveThruTime > 300) score += 2
+  return score
+}
+
 function WeeklyReport() {
   const [copyState, setCopyState] = useState('idle')
 
@@ -20,33 +88,46 @@ function WeeklyReport() {
     const storesAboveTarget = storeData.filter((store) => store.salesVsTarget >= 100)
     const storesBelowTarget = storeData.filter((store) => store.salesVsTarget < 100)
 
-    const goingWell = storeData.filter(
-      (store) =>
-        store.salesVsTarget > 105 &&
-        store.laborCostPercent <= store.laborTarget &&
-        store.foodCostPercent <= store.foodCostTarget &&
-        store.customerSatisfaction > 4.3,
-    )
+    const goingWell = storeData
+      .filter((store) => {
+        const salesWin = store.salesVsTarget >= 105
+        const costWin = store.laborCostPercent < store.laborTarget && store.foodCostPercent < store.foodCostTarget
+        const satisfactionWin = store.customerSatisfaction >= 4.5
+        const trendWin = hasThreeWeekGrowth(store.salesTrend)
+        return salesWin || costWin || satisfactionWin || trendWin
+      })
+      .map((store) => ({
+        ...store,
+        winReason: buildWinReason(store),
+      }))
+      .sort((a, b) => b.salesVsTarget - a.salesVsTarget)
+      .slice(0, 10)
 
-    const needsAttention = storeData.filter(
-      (store) =>
-        store.salesVsTarget < 97 ||
-        store.laborCostPercent > store.laborTarget + 2 ||
-        store.foodCostPercent > store.foodCostTarget + 2 ||
-        store.customerSatisfaction < 3.5 ||
-        store.driveThruTime > 240 ||
-        store.employeeTurnover > 12,
-    )
+    const needsAttention = storeData
+      .filter(
+        (store) =>
+          store.salesVsTarget < 92 ||
+          store.laborCostPercent > store.laborTarget + 3 ||
+          store.foodCostPercent > store.foodCostTarget + 3 ||
+          store.customerSatisfaction < 3.5 ||
+          store.employeeTurnover > 25 ||
+          store.driveThruTime > 300,
+      )
+      .map((store) => ({
+        ...store,
+        problemReason: buildProblemReason(store),
+      }))
+      .sort((a, b) => getCriticalScore(b) - getCriticalScore(a) || a.salesVsTarget - b.salesVsTarget)
 
     const recommendedActions = needsAttention.map((store) => {
       const actions = []
 
-      if (store.salesVsTarget < 97) actions.push('run local sales recovery offer and manager-led peak checks')
-      if (store.laborCostPercent > store.laborTarget + 2) actions.push('rebuild labor schedule to match hour-by-hour demand')
-      if (store.foodCostPercent > store.foodCostTarget + 2) actions.push('tighten waste controls and shift-level inventory counts')
+      if (store.salesVsTarget < 92) actions.push('run local sales recovery offer and manager-led peak checks')
+      if (store.laborCostPercent > store.laborTarget + 3) actions.push('rebuild labor schedule to match hour-by-hour demand')
+      if (store.foodCostPercent > store.foodCostTarget + 3) actions.push('tighten waste controls and shift-level inventory counts')
       if (store.customerSatisfaction < 3.5) actions.push('launch service recovery coaching and complaint follow-ups')
-      if (store.driveThruTime > 240) actions.push('add drive-thru expeditor at peak and simplify order handoff')
-      if (store.employeeTurnover > 12) actions.push('execute retention check-ins and 30-day crew coaching plans')
+      if (store.driveThruTime > 300) actions.push('add drive-thru expeditor at peak and simplify order handoff')
+      if (store.employeeTurnover > 25) actions.push('execute retention check-ins and 30-day crew coaching plans')
 
       return {
         id: store.id,
@@ -55,6 +136,14 @@ function WeeklyReport() {
         actions,
       }
     })
+
+    const bestPerformingStore = [...storeData].sort(
+      (a, b) => b.salesVsTarget - a.salesVsTarget || b.customerSatisfaction - a.customerSatisfaction,
+    )[0]
+
+    const mostCriticalStore = [...storeData].sort(
+      (a, b) => getCriticalScore(b) - getCriticalScore(a) || a.salesVsTarget - b.salesVsTarget,
+    )[0]
 
     const regionalBreakdown = Object.values(
       storeData.reduce((acc, store) => {
@@ -95,6 +184,8 @@ function WeeklyReport() {
       portfolioSalesVsTarget: (totalSales / totalTarget) * 100,
       storesAboveTarget,
       storesBelowTarget,
+      bestPerformingStore,
+      mostCriticalStore,
       goingWell,
       needsAttention,
       recommendedActions,
@@ -111,21 +202,21 @@ function WeeklyReport() {
     lines.push(`- Total Sales: ${currency.format(report.totalSales)} (${formatPercent(report.portfolioSalesVsTarget)} of target ${currency.format(report.totalTarget)})`)
     lines.push(`- Stores Above Target: ${report.storesAboveTarget.length}`)
     lines.push(`- Stores Below Target: ${report.storesBelowTarget.length}`)
+    lines.push(
+      `- Best performing store: ${report.bestPerformingStore.name} — ${formatPercent(report.bestPerformingStore.salesVsTarget)} vs target with satisfaction ${report.bestPerformingStore.customerSatisfaction.toFixed(1)}`,
+    )
+    lines.push(
+      `- Most critical store: ${report.mostCriticalStore.name} — ${formatPercent(report.mostCriticalStore.salesVsTarget)} vs target, labor ${formatPercent(report.mostCriticalStore.laborCostPercent)}, drive-thru ${report.mostCriticalStore.driveThruTime}s`,
+    )
     lines.push('')
     lines.push("What's Going Well")
     report.goingWell.forEach((store) => {
-      lines.push(`- ${store.id} ${store.name}: ${formatPercent(store.salesVsTarget)} sales vs target, costs in-control, satisfaction ${store.customerSatisfaction.toFixed(1)}`)
+      lines.push(`- ${store.name} (${store.city}) — ${store.winReason}`)
     })
     lines.push('')
     lines.push('Needs Attention')
     report.needsAttention.forEach((store) => {
-      lines.push(
-        `- ${store.id} ${store.name}: sales ${formatPercent(store.salesVsTarget)}, labor ${formatPercent(
-          store.laborCostPercent,
-        )}, food ${formatPercent(store.foodCostPercent)}, satisfaction ${store.customerSatisfaction.toFixed(
-          1,
-        )}, drive-thru ${store.driveThruTime}s, turnover ${formatPercent(store.employeeTurnover)}`,
-      )
+      lines.push(`- ${store.name} (${store.city}) — ${store.problemReason}`)
     })
 
     return lines.join('\n')
@@ -168,6 +259,14 @@ function WeeklyReport() {
             </li>
             <li>Stores above target: {report.storesAboveTarget.length}</li>
             <li>Stores below target: {report.storesBelowTarget.length}</li>
+            <li>
+              Best performing store: {report.bestPerformingStore.name} — {formatPercent(report.bestPerformingStore.salesVsTarget)}
+              {' '}vs target with satisfaction {report.bestPerformingStore.customerSatisfaction.toFixed(1)}
+            </li>
+            <li>
+              Most critical store: {report.mostCriticalStore.name} — {formatPercent(report.mostCriticalStore.salesVsTarget)}
+              {' '}vs target, labor {formatPercent(report.mostCriticalStore.laborCostPercent)}, drive-thru {report.mostCriticalStore.driveThruTime}s
+            </li>
           </ul>
         </article>
 
@@ -176,9 +275,7 @@ function WeeklyReport() {
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {report.goingWell.map((store) => (
               <li key={store.id}>
-                <span className="font-semibold text-white">{store.id}</span> {store.name} — {formatPercent(store.salesVsTarget)}
-                {' '}sales vs target, labor {formatPercent(store.laborCostPercent)}, food {formatPercent(store.foodCostPercent)}, satisfaction{' '}
-                {store.customerSatisfaction.toFixed(1)}
+                {store.name} ({store.city}) — {store.winReason}
               </li>
             ))}
           </ul>
@@ -189,9 +286,7 @@ function WeeklyReport() {
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {report.needsAttention.map((store) => (
               <li key={store.id}>
-                <span className="font-semibold text-white">{store.id}</span> {store.name} — {formatPercent(store.salesVsTarget)}
-                {' '}sales vs target, labor {formatPercent(store.laborCostPercent)}, food {formatPercent(store.foodCostPercent)}, satisfaction{' '}
-                {store.customerSatisfaction.toFixed(1)}, drive-thru {store.driveThruTime}s, turnover {formatPercent(store.employeeTurnover)}
+                {store.name} ({store.city}) — {store.problemReason}
               </li>
             ))}
           </ul>
