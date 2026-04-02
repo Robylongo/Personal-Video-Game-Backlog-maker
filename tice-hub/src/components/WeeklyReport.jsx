@@ -119,15 +119,59 @@ function WeeklyReport() {
       }))
       .sort((a, b) => getCriticalScore(b) - getCriticalScore(a) || a.salesVsTarget - b.salesVsTarget)
 
-    const recommendedActions = needsAttention.map((store) => {
-      const actions = []
+    const portfolioAverageTurnover =
+      storeData.reduce((sum, store) => sum + store.employeeTurnover, 0) / storeData.length
 
-      if (store.salesVsTarget < 92) actions.push('run local sales recovery offer and manager-led peak checks')
-      if (store.laborCostPercent > store.laborTarget + 3) actions.push('rebuild labor schedule to match hour-by-hour demand')
-      if (store.foodCostPercent > store.foodCostTarget + 3) actions.push('tighten waste controls and shift-level inventory counts')
-      if (store.customerSatisfaction < 3.5) actions.push('launch service recovery coaching and complaint follow-ups')
-      if (store.driveThruTime > 300) actions.push('add drive-thru expeditor at peak and simplify order handoff')
-      if (store.employeeTurnover > 25) actions.push('execute retention check-ins and 30-day crew coaching plans')
+    const recommendedActions = needsAttention.map((store) => {
+      const actionCandidates = []
+
+      if (store.laborCostPercent > store.laborTarget + 3) {
+        actionCandidates.push({
+          severity: (store.laborCostPercent - (store.laborTarget + 3)) * 100,
+          action: `Review ${store.name} scheduling against hourly sales data. Identify overstaffed dayparts and reduce overlap shifts. Target: bring labor from ${store.laborCostPercent.toFixed(1)}% to ${store.laborTarget.toFixed(1)}% within 2 weeks.`,
+        })
+      }
+
+      if (store.foodCostPercent > store.foodCostTarget + 3) {
+        actionCandidates.push({
+          severity: (store.foodCostPercent - (store.foodCostTarget + 3)) * 100,
+          action: `Conduct waste audit at ${store.name} this week. Review prep quantities vs actual sales and check for portioning drift. Current food cost ${store.foodCostPercent.toFixed(1)}% vs ${store.foodCostTarget.toFixed(1)}% target.`,
+        })
+      }
+
+      if (store.employeeTurnover > 25) {
+        const turnoverRatio = (store.employeeTurnover / portfolioAverageTurnover).toFixed(1)
+        actionCandidates.push({
+          severity: (store.employeeTurnover - 25) * 10,
+          action: `Schedule exit interview review at ${store.name} with district manager. Current ${store.employeeTurnover.toFixed(1)}% monthly turnover is ${turnoverRatio}x portfolio average. Evaluate shift lead effectiveness and crew scheduling fairness.`,
+        })
+      }
+
+      if (store.customerSatisfaction < 3.5) {
+        actionCandidates.push({
+          severity: (3.5 - store.customerSatisfaction) * 100,
+          action: `Deploy mystery shop at ${store.name} within 5 business days. Current ${store.customerSatisfaction.toFixed(1)} satisfaction is lowest in portfolio. Review speed-of-service and order accuracy logs.`,
+        })
+      }
+
+      if (store.salesVsTarget < 92) {
+        actionCandidates.push({
+          severity: (92 - store.salesVsTarget) * 10,
+          action: `Analyze ${store.name} traffic patterns vs prior year. Review local marketing activation and promotional compliance. Evaluate whether competitive openings have impacted trade area.`,
+        })
+      }
+
+      if (store.driveThruTime > 300) {
+        actionCandidates.push({
+          severity: store.driveThruTime - 300,
+          action: `Evaluate drive-thru bottleneck at ${store.name}. Check equipment functionality, menu board clarity, and peak-hour positioning. Current avg ${store.driveThruTime} seconds vs 180-second target.`,
+        })
+      }
+
+      const actions = actionCandidates
+        .sort((a, b) => b.severity - a.severity)
+        .slice(0, 2)
+        .map((item) => item.action)
 
       return {
         id: store.id,
