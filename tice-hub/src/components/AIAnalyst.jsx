@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import storeData from '../data/storeData'
 
 const suggestedQuestions = [
@@ -148,7 +149,23 @@ function AIAnalyst() {
                       : 'bg-orange-500 text-[#1f1306] font-medium'
                   }`}
                 >
-                  {message.content}
+                  {isAssistant ? (
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
+                        ol: ({ children }) => (
+                          <ol className="mb-2 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>
+                        ),
+                        li: ({ children }) => <li>{children}</li>,
+                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : (
+                    message.content
+                  )}
                 </div>
               </div>
             )
