@@ -93,10 +93,14 @@ function Dashboard() {
 
     const storeCount = filteredStores.length || 1
 
+    const salesVariance = totals.sales - totals.target
+
     return {
       totalSales: totals.sales,
       totalTarget: totals.target,
       totalSalesVsTarget: (totals.sales / totals.target) * 100,
+      salesVariance,
+      salesVarianceDirection: salesVariance >= 0 ? 'above' : 'below',
       avgLabor: totals.labor / storeCount,
       avgFood: totals.food / storeCount,
       alertStores: totals.alertCount,
@@ -128,9 +132,16 @@ function Dashboard() {
       <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
           <p className="text-xs uppercase tracking-wide text-slate-400">Total Weekly Sales vs Target</p>
-          <p className="mt-2 text-2xl font-semibold text-white">{currency.format(summary.totalSales)}</p>
+          <p
+            className={`mt-2 text-2xl font-semibold ${
+              summary.totalSalesVsTarget >= 100 ? 'text-emerald-300' : 'text-rose-300'
+            }`}
+          >
+            {summary.totalSalesVsTarget.toFixed(1)}%
+          </p>
           <p className="mt-1 text-sm text-slate-300">
-            {summary.totalSalesVsTarget.toFixed(1)}% of {currency.format(summary.totalTarget)}
+            {summary.salesVariance >= 0 ? '+' : '-'}
+            {currency.format(Math.abs(summary.salesVariance))} {summary.salesVarianceDirection} target
           </p>
         </article>
 

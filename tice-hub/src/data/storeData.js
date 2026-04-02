@@ -463,9 +463,32 @@ const baseStores = [
   },
 ]
 
-const storeData = baseStores.map((store) => ({
-  ...store,
-  salesVsTarget: Number(((store.weeklySales / store.weeklyTarget) * 100).toFixed(1)),
-}))
+
+function buildAlerts(store) {
+  const alerts = []
+
+  if (store.salesVsTarget < 92) alerts.push('Sales vs target below 92%')
+  if (store.laborCostPercent > store.laborTarget + 3) alerts.push('Labor cost exceeds target by >3 pts')
+  if (store.foodCostPercent > store.foodCostTarget + 3) alerts.push('Food cost exceeds target by >3 pts')
+  if (store.customerSatisfaction < 3.5) alerts.push('Customer satisfaction below 3.5')
+  if (store.employeeTurnover > 25) alerts.push('Employee turnover above 25%')
+  if (store.driveThruTime > 300) alerts.push('Drive-thru time above 300 seconds')
+
+  return alerts
+}
+
+const storeData = baseStores.map((store) => {
+  const salesVsTarget = Number(((store.weeklySales / store.weeklyTarget) * 100).toFixed(1))
+
+  const computedStore = {
+    ...store,
+    salesVsTarget,
+  }
+
+  return {
+    ...computedStore,
+    alerts: buildAlerts(computedStore),
+  }
+})
 
 export default storeData
