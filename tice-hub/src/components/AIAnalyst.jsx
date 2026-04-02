@@ -12,7 +12,7 @@ const suggestedQuestions = [
 ]
 
 function AIAnalyst() {
-  const [apiKey, setApiKey] = useState('[paste your key here]')
+  const [apiKey, setApiKey] = useState('sk-...')
   const [question, setQuestion] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
