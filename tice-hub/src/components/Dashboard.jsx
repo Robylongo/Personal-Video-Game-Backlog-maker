@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import storeData from '../data/storeData'
 
-const SALES_THRESHOLDS = { green: 105, yellow: 95 }
-const COST_BUFFER = 2
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -17,21 +15,57 @@ function metricPillClass(status) {
 }
 
 function getSalesStatus(value) {
-  if (value >= SALES_THRESHOLDS.green) return 'good'
-  if (value >= SALES_THRESHOLDS.yellow) return 'warn'
+  if (value >= 100) return 'good'
+  if (value >= 95) return 'warn'
   return 'bad'
 }
 
-function getCostStatus(value, target) {
-  if (value <= target) return 'good'
-  if (value <= target + COST_BUFFER) return 'warn'
+function getLaborStatus(value) {
+  if (value <= 29) return 'good'
+  if (value <= 31) return 'warn'
+  return 'bad'
+}
+
+function getFoodStatus(value) {
+  if (value <= 31) return 'good'
+  if (value <= 33) return 'warn'
   return 'bad'
 }
 
 function getSatisfactionStatus(value) {
-  if (value >= 4.5) return 'good'
-  if (value >= 4) return 'warn'
+  if (value >= 4.3) return 'good'
+  if (value >= 3.8) return 'warn'
   return 'bad'
+}
+
+function getRowHealthStatus(store) {
+  const salesRed = store.salesVsTarget < 95
+  const laborRed = store.laborCostPercent > store.laborTarget + 3
+  const foodRed = store.foodCostPercent > store.foodCostTarget + 3
+
+  if (salesRed || laborRed || foodRed) return 'bad'
+
+  const isGreen =
+    store.salesVsTarget >= 100 &&
+    store.laborCostPercent <= store.laborTarget &&
+    store.foodCostPercent <= store.foodCostTarget
+
+  if (isGreen) return 'good'
+
+  const salesYellow = store.salesVsTarget >= 95 && store.salesVsTarget < 100
+  const slightCostOverage =
+    (store.laborCostPercent > store.laborTarget && store.laborCostPercent <= store.laborTarget + 2) ||
+    (store.foodCostPercent > store.foodCostTarget && store.foodCostPercent <= store.foodCostTarget + 2)
+
+  if (salesYellow || slightCostOverage) return 'warn'
+
+  return 'warn'
+}
+
+function getRowClass(status) {
+  if (status === 'good') return 'border-l-4 border-l-[#16A34A]'
+  if (status === 'warn') return 'border-l-4 border-l-[#EAB308]'
+  return 'border-l-4 border-l-[#DC2626] bg-[rgba(220,38,38,0.08)]'
 }
 
 const columnConfig = {
@@ -205,7 +239,10 @@ function Dashboard() {
             </thead>
             <tbody className="divide-y divide-slate-800">
               {sortedStores.map((store) => (
-                <tr key={store.id} className="hover:bg-slate-800/60">
+                <tr
+                  key={store.id}
+                  className={`${getRowClass(getRowHealthStatus(store))} hover:bg-slate-800/60`}
+                >
                   <td className="px-3 py-3 font-medium text-white">{store.name}</td>
                   <td className="px-3 py-3 text-slate-300">{store.city}, {store.state}</td>
                   <td className="px-3 py-3">{currency.format(store.weeklySales)}</td>
@@ -215,12 +252,12 @@ function Dashboard() {
                     </span>
                   </td>
                   <td className="px-3 py-3">
-                    <span className={`rounded-md px-2 py-1 text-xs font-semibold ${metricPillClass(getCostStatus(store.laborCostPercent, store.laborTarget))}`}>
+                    <span className={`rounded-md px-2 py-1 text-xs font-semibold ${metricPillClass(getLaborStatus(store.laborCostPercent))}`}>
                       {store.laborCostPercent.toFixed(1)}%
                     </span>
                   </td>
                   <td className="px-3 py-3">
-                    <span className={`rounded-md px-2 py-1 text-xs font-semibold ${metricPillClass(getCostStatus(store.foodCostPercent, store.foodCostTarget))}`}>
+                    <span className={`rounded-md px-2 py-1 text-xs font-semibold ${metricPillClass(getFoodStatus(store.foodCostPercent))}`}>
                       {store.foodCostPercent.toFixed(1)}%
                     </span>
                   </td>
